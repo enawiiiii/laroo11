@@ -55,17 +55,6 @@ export const PRODUCT_TYPES = [
   "معطف",
 ] as const;
 
-export const BRANDS = [
-  "Zara",
-  "H&M",
-  "Mango",
-  "Forever 21",
-  "Massimo Dutti",
-  "Pull & Bear",
-  "Bershka",
-  "Stradivarius",
-  "أخرى",
-] as const;
 
 export const SIZES = [
   "38", "40", "42", "44", "46", "48", "50", "52"

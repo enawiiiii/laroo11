@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useStore } from "@/hooks/use-store";
 import { apiRequest } from "@/lib/queryClient";
 import { insertProductSchema, type ProductWithColors } from "@shared/schema";
-import { BRANDS, PRODUCT_TYPES, COLORS, SIZES } from "@/lib/constants";
+import { PRODUCT_TYPES, SIZES } from "@/lib/constants";
 import { z } from "zod";
 
 const productFormSchema = insertProductSchema.extend({
@@ -22,8 +22,8 @@ const productFormSchema = insertProductSchema.extend({
     colorName: z.string().min(1, "Color name is required"),
     inventory: z.array(z.object({
       id: z.number().optional(), // For existing inventory
-      size: z.string().transform((val) => parseFloat(val)).refine(
-        (size) => [38, 40, 42, 44, 46, 48, 50, 52].includes(size),
+      size: z.string().refine(
+        (size) => ["38", "40", "42", "44", "46", "48", "50", "52"].includes(size),
         { message: "المقاس يجب أن يكون من المقاسات المتاحة" }
       ),
       quantity: z.number().min(0, "Quantity must be positive"),
@@ -42,8 +42,7 @@ export default function ProductForm({ product, onSuccess }: ProductFormProps) {
   const { toast } = useToast();
   const { currentStore } = useStore();
   const [newColorName, setNewColorName] = useState("");
-  const [newSize, setNewSize] = useState("");
-  const [newQuantity, setNewQuantity] = useState("");
+  const [colorInputs, setColorInputs] = useState<{[key: number]: {size: string, quantity: string}}>({});
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
 
@@ -210,26 +209,30 @@ export default function ProductForm({ product, onSuccess }: ProductFormProps) {
   };
 
   const addInventoryToColor = (colorIndex: number) => {
-    const quantity = parseInt(newQuantity) || 0;
-    if (!newSize || quantity < 0) return;
+    const colorInput = colorInputs[colorIndex] || { size: "", quantity: "" };
+    const quantity = parseInt(colorInput.quantity) || 0;
+    if (!colorInput.size || quantity < 0) return;
 
     const colors = form.getValues("colors");
     const color = colors[colorIndex];
     
-    const existingSize = color.inventory.find(inv => inv.size === newSize);
+    const existingSize = color.inventory.find(inv => inv.size.toString() === colorInput.size);
     if (existingSize) {
       toast({
-        title: "Warning",
-        description: "Size already exists for this color",
+        title: "تحذير",
+        description: "المقاس موجود بالفعل لهذا اللون",
         variant: "destructive",
       });
       return;
     }
 
-    color.inventory.push({ size: newSize, quantity: quantity });
+    color.inventory.push({ size: colorInput.size, quantity: quantity });
     form.setValue("colors", colors);
-    setNewSize("");
-    setNewQuantity("");
+    
+    // Clear input for this specific color
+    const newInputs = { ...colorInputs };
+    newInputs[colorIndex] = { size: "", quantity: "" };
+    setColorInputs(newInputs);
   };
 
   const removeInventoryFromColor = (colorIndex: number, inventoryIndex: number) => {
@@ -270,19 +273,10 @@ export default function ProductForm({ product, onSuccess }: ProductFormProps) {
                 name="brand"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Brand</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-brand">
-                          <SelectValue placeholder="Select brand" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {BRANDS.map((brand) => (
-                          <SelectItem key={brand} value={brand}>{brand}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormLabel className="text-right">اسم الشركة التركية</FormLabel>
+                    <FormControl>
+                      <Input placeholder="مثال: LC Waikiki, Defacto" {...field} data-testid="input-brand" className="text-right" />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -348,9 +342,11 @@ export default function ProductForm({ product, onSuccess }: ProductFormProps) {
                   <FormLabel>Specifications</FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder="Product specifications..."
+                      placeholder="مواصفات المنتج..."
                       {...field}
+                      value={field.value || ""}
                       data-testid="textarea-specifications"
+                      className="text-right"
                     />
                   </FormControl>
                   <FormMessage />
@@ -401,18 +397,15 @@ export default function ProductForm({ product, onSuccess }: ProductFormProps) {
           <CardContent className="space-y-4">
             {/* Add New Color */}
             <div className="flex gap-2">
-              <Select value={newColorName} onValueChange={setNewColorName}>
-                <SelectTrigger className="flex-1" data-testid="select-new-color">
-                  <SelectValue placeholder="Select color to add" />
-                </SelectTrigger>
-                <SelectContent>
-                  {COLORS.filter(color => !watchedColors.some(c => c.colorName === color)).map((color) => (
-                    <SelectItem key={color} value={color}>{color}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button type="button" onClick={addColor} data-testid="button-add-color">
-                Add Color
+              <Input 
+                placeholder="اكتب اسم اللون" 
+                value={newColorName} 
+                onChange={(e) => setNewColorName(e.target.value)}
+                className="flex-1 text-right" 
+                data-testid="input-new-color"
+              />
+              <Button type="button" onClick={addColor} data-testid="button-add-color" className="text-right">
+                إضافة لون
               </Button>
             </div>
 
@@ -437,12 +430,23 @@ export default function ProductForm({ product, onSuccess }: ProductFormProps) {
                   <CardContent>
                     {/* Add Inventory */}
                     <div className="flex gap-2 mb-3">
-                      <Select value={newSize} onValueChange={setNewSize}>
+                      <Select 
+                        value={colorInputs[colorIndex]?.size || ""} 
+                        onValueChange={(value) => {
+                          const newInputs = { ...colorInputs };
+                          newInputs[colorIndex] = { 
+                            ...newInputs[colorIndex], 
+                            size: value, 
+                            quantity: newInputs[colorIndex]?.quantity || "" 
+                          };
+                          setColorInputs(newInputs);
+                        }}
+                      >
                         <SelectTrigger className="flex-1" data-testid={`select-size-${colorIndex}`}>
-                          <SelectValue placeholder="Select size" />
+                          <SelectValue placeholder="اختر المقاس" />
                         </SelectTrigger>
                         <SelectContent>
-                          {SIZES.filter(size => !color.inventory.some(inv => inv.size === size)).map((size) => (
+                          {SIZES.filter(size => !color.inventory.some(inv => inv.size.toString() === size)).map((size) => (
                             <SelectItem key={size} value={size}>{size}</SelectItem>
                           ))}
                         </SelectContent>
@@ -450,8 +454,16 @@ export default function ProductForm({ product, onSuccess }: ProductFormProps) {
                       <Input
                         type="text"
                         placeholder="الكمية"
-                        value={newQuantity}
-                        onChange={(e) => setNewQuantity(e.target.value)}
+                        value={colorInputs[colorIndex]?.quantity || ""}
+                        onChange={(e) => {
+                          const newInputs = { ...colorInputs };
+                          newInputs[colorIndex] = { 
+                            ...newInputs[colorIndex], 
+                            size: newInputs[colorIndex]?.size || "", 
+                            quantity: e.target.value 
+                          };
+                          setColorInputs(newInputs);
+                        }}
                         className="w-24 text-right"
                         data-testid={`input-quantity-${colorIndex}`}
                       />
@@ -459,8 +471,9 @@ export default function ProductForm({ product, onSuccess }: ProductFormProps) {
                         type="button"
                         onClick={() => addInventoryToColor(colorIndex)}
                         data-testid={`button-add-inventory-${colorIndex}`}
+                        className="text-right"
                       >
-                        Add
+                        إضافة
                       </Button>
                     </div>
 

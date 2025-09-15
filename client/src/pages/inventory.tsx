@@ -16,7 +16,7 @@ import ProductForm from "@/components/inventory/product-form";
 import ProductDetailsModal from "@/components/inventory/product-details-modal";
 import { useStore } from "@/hooks/use-store";
 import { apiRequest } from "@/lib/queryClient";
-import { BRANDS, PRODUCT_TYPES } from "@/lib/constants";
+import { PRODUCT_TYPES } from "@/lib/constants";
 import type { ProductWithColors } from "@shared/schema";
 
 export default function Inventory() {
@@ -27,7 +27,6 @@ export default function Inventory() {
   const queryClient = useQueryClient();
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [brandFilter, setBrandFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [stockFilter, setStockFilter] = useState("all");
   const [showProductForm, setShowProductForm] = useState(false);
@@ -89,7 +88,6 @@ export default function Inventory() {
       product.modelNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.brand.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesBrand = brandFilter === "all" || product.brand === brandFilter;
     const matchesType = typeFilter === "all" || product.productType === typeFilter;
     
     let matchesStock = true;
@@ -100,7 +98,7 @@ export default function Inventory() {
       if (stockFilter === "out_of_stock" && stockStatus.status !== "Out of stock") matchesStock = false;
     }
 
-    return matchesSearch && matchesBrand && matchesType && matchesStock;
+    return matchesSearch && matchesType && matchesStock;
   });
 
   if (!isLoggedIn) return null;
@@ -140,38 +138,25 @@ export default function Inventory() {
           {/* Search and Filters */}
           <Card className="mb-6">
             <CardContent className="p-4">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-2">Search Products</label>
+                  <label className="block text-sm font-medium mb-2 text-right">البحث في المنتجات</label>
                   <Input
-                    placeholder="Product code, model, brand..."
+                    placeholder="رقم المنتج، الموديل، الشركة..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     data-testid="input-search-products"
+                    className="text-right"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">Brand</label>
-                  <Select value={brandFilter} onValueChange={setBrandFilter}>
-                    <SelectTrigger data-testid="select-brand-filter">
-                      <SelectValue placeholder="All Brands" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Brands</SelectItem>
-                      {BRANDS.map((brand) => (
-                        <SelectItem key={brand} value={brand}>{brand}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Product Type</label>
+                  <label className="block text-sm font-medium mb-2 text-right">نوع المنتج</label>
                   <Select value={typeFilter} onValueChange={setTypeFilter}>
                     <SelectTrigger data-testid="select-type-filter">
-                      <SelectValue placeholder="All Types" />
+                      <SelectValue placeholder="جميع الأنواع" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Types</SelectItem>
+                      <SelectItem value="all">جميع الأنواع</SelectItem>
                       {PRODUCT_TYPES.map((type) => (
                         <SelectItem key={type} value={type}>{type}</SelectItem>
                       ))}
@@ -179,16 +164,16 @@ export default function Inventory() {
                   </Select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">Stock Status</label>
+                  <label className="block text-sm font-medium mb-2 text-right">حالة المخزون</label>
                   <Select value={stockFilter} onValueChange={setStockFilter}>
                     <SelectTrigger data-testid="select-stock-filter">
-                      <SelectValue placeholder="All Stock" />
+                      <SelectValue placeholder="جميع المخزون" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Stock</SelectItem>
-                      <SelectItem value="in_stock">In Stock</SelectItem>
-                      <SelectItem value="low_stock">Low Stock</SelectItem>
-                      <SelectItem value="out_of_stock">Out of Stock</SelectItem>
+                      <SelectItem value="all">جميع المخزون</SelectItem>
+                      <SelectItem value="in_stock">متوفر</SelectItem>
+                      <SelectItem value="low_stock">مخزون قليل</SelectItem>
+                      <SelectItem value="out_of_stock">غير متوفر</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
