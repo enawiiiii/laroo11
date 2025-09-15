@@ -12,15 +12,20 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useStore } from "@/hooks/use-store";
 import { apiRequest } from "@/lib/queryClient";
-import { insertProductSchema } from "@shared/schema";
+import { insertProductSchema, type ProductWithColors } from "@shared/schema";
 import { BRANDS, PRODUCT_TYPES, COLORS, SIZES } from "@/lib/constants";
 import { z } from "zod";
 
 const productFormSchema = insertProductSchema.extend({
   colors: z.array(z.object({
+    id: z.number().optional(), // For existing colors
     colorName: z.string().min(1, "Color name is required"),
     inventory: z.array(z.object({
-      size: z.string().min(1, "Size is required"),
+      id: z.number().optional(), // For existing inventory
+      size: z.string().transform((val) => parseFloat(val)).refine(
+        (size) => [38, 40, 42, 44, 46, 48, 50, 52].includes(size),
+        { message: "المقاس يجب أن يكون من المقاسات المتاحة" }
+      ),
       quantity: z.number().min(0, "Quantity must be positive"),
     })),
   })).min(1, "At least one color is required"),
@@ -29,25 +34,36 @@ const productFormSchema = insertProductSchema.extend({
 type ProductFormData = z.infer<typeof productFormSchema>;
 
 interface ProductFormProps {
+  product?: ProductWithColors;
   onSuccess: () => void;
 }
 
-export default function ProductForm({ onSuccess }: ProductFormProps) {
+export default function ProductForm({ product, onSuccess }: ProductFormProps) {
   const { toast } = useToast();
   const { currentStore } = useStore();
   const [newColorName, setNewColorName] = useState("");
   const [newSize, setNewSize] = useState("");
-  const [newQuantity, setNewQuantity] = useState(0);
+  const [newQuantity, setNewQuantity] = useState("");
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>("");
 
   const form = useForm<ProductFormData>({
     resolver: zodResolver(productFormSchema),
-    defaultValues: {
-      productCode: "",
+    defaultValues: product ? {
+      modelNumber: product.modelNumber,
+      brand: product.brand,
+      productType: product.productType,
+      storePriceAED: product.storePriceAED,
+      onlinePriceAED: product.onlinePriceAED,
+      specifications: product.specifications || "",
+      imageUrl: product.imageUrl || "",
+      colors: product.colors || [],
+    } : {
       modelNumber: "",
       brand: "",
       productType: "",
-      storePriceAED: "0",
-      onlinePriceAED: "0",
+      storePriceAED: "",
+      onlinePriceAED: "",
       specifications: "",
       imageUrl: "",
       colors: [],
@@ -56,35 +72,91 @@ export default function ProductForm({ onSuccess }: ProductFormProps) {
 
   const createProductMutation = useMutation({
     mutationFn: async (data: ProductFormData) => {
-      // Create product
-      const product = await apiRequest("POST", "/api/products", {
-        productCode: data.productCode,
-        modelNumber: data.modelNumber,
-        brand: data.brand,
-        productType: data.productType,
-        storePriceAED: data.storePriceAED,
-        onlinePriceAED: data.onlinePriceAED,
-        specifications: data.specifications,
-        imageUrl: data.imageUrl,
-      });
-
-      const productData = await product.json();
-
-      // Create colors and inventory
-      for (const color of data.colors) {
-        const colorResponse = await apiRequest("POST", `/api/products/${productData.id}/colors`, {
-          colorName: color.colorName,
+      // Convert image to base64 if selected
+      let imageUrl = data.imageUrl;
+      if (selectedImage) {
+        const reader = new FileReader();
+        imageUrl = await new Promise<string>((resolve) => {
+          reader.onload = () => resolve(reader.result as string);
+          reader.readAsDataURL(selectedImage);
         });
-        const colorData = await colorResponse.json();
+      }
+      
+      let productData;
+      if (product) {
+        // Update existing product basic info
+        const response = await apiRequest("PUT", `/api/products/${product.id}`, {
+          modelNumber: data.modelNumber,
+          brand: data.brand,
+          productType: data.productType,
+          storePriceAED: data.storePriceAED,
+          onlinePriceAED: data.onlinePriceAED,
+          specifications: data.specifications,
+          imageUrl: imageUrl,
+        });
+        productData = await response.json();
 
-        // Create inventory entries
-        for (const inv of color.inventory) {
-          await apiRequest("PUT", "/api/inventory", {
-            productColorId: colorData.id,
-            store: currentStore,
-            size: inv.size,
-            quantity: inv.quantity,
+        // Handle colors and inventory with diff-based updates
+        const existingColors = product.colors || [];
+        const formColors = data.colors;
+
+        // Find colors to delete (exist in product but not in form)
+        const colorsToDelete = existingColors.filter(
+          existingColor => !formColors.some(formColor => formColor.colorName === existingColor.colorName)
+        );
+
+        // Delete removed colors
+        for (const colorToDelete of colorsToDelete) {
+          await apiRequest("DELETE", `/api/colors/${colorToDelete.id}`, {});
+        }
+
+        // Process each color in the form
+        for (const formColor of formColors) {
+          // Get or create color (API now handles idempotency)
+          const colorResponse = await apiRequest("POST", `/api/products/${productData.id}/colors`, {
+            colorName: formColor.colorName,
           });
+          const colorData = await colorResponse.json();
+
+          // Update inventory for each size
+          for (const inv of formColor.inventory) {
+            await apiRequest("PUT", "/api/inventory", {
+              productColorId: colorData.id,
+              store: currentStore,
+              size: inv.size.toString(),
+              quantity: parseInt(inv.quantity.toString()) || 0,
+            });
+          }
+        }
+      } else {
+        // Create new product
+        const response = await apiRequest("POST", "/api/products", {
+          modelNumber: data.modelNumber,
+          brand: data.brand,
+          productType: data.productType,
+          storePriceAED: data.storePriceAED,
+          onlinePriceAED: data.onlinePriceAED,
+          specifications: data.specifications,
+          imageUrl: imageUrl,
+        });
+        productData = await response.json();
+
+        // Create colors and inventory for new product
+        for (const color of data.colors) {
+          const colorResponse = await apiRequest("POST", `/api/products/${productData.id}/colors`, {
+            colorName: color.colorName,
+          });
+          const colorData = await colorResponse.json();
+
+          // Create inventory entries
+          for (const inv of color.inventory) {
+            await apiRequest("PUT", "/api/inventory", {
+              productColorId: colorData.id,
+              store: currentStore,
+              size: inv.size.toString(),
+              quantity: parseInt(inv.quantity.toString()) || 0,
+            });
+          }
         }
       }
 
@@ -93,14 +165,14 @@ export default function ProductForm({ onSuccess }: ProductFormProps) {
     onSuccess: () => {
       toast({
         title: "Success",
-        description: "Product created successfully",
+        description: product ? "Product updated successfully" : "Product created successfully",
       });
       onSuccess();
     },
     onError: (error) => {
       toast({
         title: "Error",
-        description: "Failed to create product",
+        description: product ? "Failed to update product" : "Failed to create product",
         variant: "destructive",
       });
     },
@@ -138,7 +210,8 @@ export default function ProductForm({ onSuccess }: ProductFormProps) {
   };
 
   const addInventoryToColor = (colorIndex: number) => {
-    if (!newSize || newQuantity < 0) return;
+    const quantity = parseInt(newQuantity) || 0;
+    if (!newSize || quantity < 0) return;
 
     const colors = form.getValues("colors");
     const color = colors[colorIndex];
@@ -153,10 +226,10 @@ export default function ProductForm({ onSuccess }: ProductFormProps) {
       return;
     }
 
-    color.inventory.push({ size: newSize, quantity: newQuantity });
+    color.inventory.push({ size: newSize, quantity: quantity });
     form.setValue("colors", colors);
     setNewSize("");
-    setNewQuantity(0);
+    setNewQuantity("");
   };
 
   const removeInventoryFromColor = (colorIndex: number, inventoryIndex: number) => {
@@ -177,19 +250,6 @@ export default function ProductForm({ onSuccess }: ProductFormProps) {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="productCode"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Product Code</FormLabel>
-                    <FormControl>
-                      <Input placeholder="PRD001" {...field} data-testid="input-product-code" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
 
               <FormField
                 control={form.control}
@@ -256,9 +316,9 @@ export default function ProductForm({ onSuccess }: ProductFormProps) {
                 name="storePriceAED"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Store Price (AED)</FormLabel>
+                    <FormLabel className="text-right">سعر البوتيك (درهم)</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" placeholder="299.00" {...field} data-testid="input-store-price" />
+                      <Input type="text" placeholder="299" {...field} data-testid="input-store-price" className="text-right" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -270,9 +330,9 @@ export default function ProductForm({ onSuccess }: ProductFormProps) {
                 name="onlinePriceAED"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Online Price (AED)</FormLabel>
+                    <FormLabel className="text-right">السعر الأونلاين (درهم)</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" placeholder="329.00" {...field} data-testid="input-online-price" />
+                      <Input type="text" placeholder="329" {...field} data-testid="input-online-price" className="text-right" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -298,19 +358,38 @@ export default function ProductForm({ onSuccess }: ProductFormProps) {
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="imageUrl"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Image URL</FormLabel>
-                  <FormControl>
-                    <Input placeholder="https://..." {...field} data-testid="input-image-url" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
+            {/* Image Upload */}
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2 text-right">صورة المنتج</label>
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setSelectedImage(file);
+                      const reader = new FileReader();
+                      reader.onload = (e) => {
+                        setImagePreview(e.target?.result as string);
+                        form.setValue('imageUrl', e.target?.result as string);
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                  }}
+                  data-testid="input-image-file"
+                />
+              </div>
+              {imagePreview && (
+                <div className="flex justify-center">
+                  <img
+                    src={imagePreview}
+                    alt="معاينة الصورة"
+                    className="max-w-xs max-h-48 object-cover rounded-lg border"
+                  />
+                </div>
               )}
-            />
+            </div>
           </CardContent>
         </Card>
 
@@ -369,11 +448,11 @@ export default function ProductForm({ onSuccess }: ProductFormProps) {
                         </SelectContent>
                       </Select>
                       <Input
-                        type="number"
-                        placeholder="Quantity"
+                        type="text"
+                        placeholder="الكمية"
                         value={newQuantity}
-                        onChange={(e) => setNewQuantity(parseInt(e.target.value) || 0)}
-                        className="w-24"
+                        onChange={(e) => setNewQuantity(e.target.value)}
+                        className="w-24 text-right"
                         data-testid={`input-quantity-${colorIndex}`}
                       />
                       <Button
@@ -418,7 +497,10 @@ export default function ProductForm({ onSuccess }: ProductFormProps) {
             disabled={createProductMutation.isPending}
             data-testid="button-submit-product"
           >
-            {createProductMutation.isPending ? "Creating..." : "Create Product"}
+            {createProductMutation.isPending 
+              ? (product ? "Updating..." : "Creating...") 
+              : (product ? "Update Product" : "Create Product")
+            }
           </Button>
         </div>
       </form>

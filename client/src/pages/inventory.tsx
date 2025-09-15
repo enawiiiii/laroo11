@@ -6,10 +6,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { useI18n } from "@/lib/i18n";
 import Header from "@/components/layout/header";
 import Sidebar from "@/components/layout/sidebar";
 import ProductForm from "@/components/inventory/product-form";
@@ -23,6 +23,7 @@ export default function Inventory() {
   const { isLoggedIn, currentStore } = useStore();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { t } = useI18n();
   const queryClient = useQueryClient();
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -32,6 +33,7 @@ export default function Inventory() {
   const [showProductForm, setShowProductForm] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<ProductWithColors | null>(null);
   const [showProductDetails, setShowProductDetails] = useState(false);
+  const [showEditProduct, setShowEditProduct] = useState(false);
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -65,7 +67,7 @@ export default function Inventory() {
   });
 
   const handleDeleteProduct = (productId: number) => {
-    if (confirm("Are you sure you want to delete this product?")) {
+    if (confirm(t("confirm_delete"))) {
       deleteProductMutation.mutate(productId);
     }
   };
@@ -82,9 +84,8 @@ export default function Inventory() {
     return { status: `${totalStock} items`, variant: "default" as const };
   };
 
-  const filteredProducts = products.filter((product: ProductWithColors) => {
+  const filteredProducts = (products as ProductWithColors[]).filter((product: ProductWithColors) => {
     const matchesSearch = !searchTerm || 
-      product.productCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.modelNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.brand.toLowerCase().includes(searchTerm.toLowerCase());
     
@@ -112,19 +113,19 @@ export default function Inventory() {
         <main className="flex-1 p-6">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="text-2xl font-bold text-foreground mb-2">Inventory Management</h2>
-              <p className="text-muted-foreground">Manage products, colors, sizes, and stock quantities</p>
+              <h2 className="text-2xl font-bold text-foreground mb-2 text-right">{t("inventory")}</h2>
+              <p className="text-muted-foreground text-right">إدارة المنتجات والألوان والمقاسات وكميات المخزون</p>
             </div>
             <Dialog open={showProductForm} onOpenChange={setShowProductForm}>
               <DialogTrigger asChild>
                 <Button className="bg-primary text-primary-foreground" data-testid="button-add-product">
-                  <i className="fas fa-plus mr-2"></i>
-                  Add New Product
+                  <i className="fas fa-plus ml-2"></i>
+                  {t("add_product")}
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle>Add New Product</DialogTitle>
+                  <DialogTitle>{t("add_product")}</DialogTitle>
                 </DialogHeader>
                 <ProductForm
                   onSuccess={() => {
@@ -195,113 +196,125 @@ export default function Inventory() {
             </CardContent>
           </Card>
           
-          {/* Products Table */}
-          <Card>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Product</TableHead>
-                    <TableHead>Code</TableHead>
-                    <TableHead>Brand</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Store Price</TableHead>
-                    <TableHead>Online Price</TableHead>
-                    <TableHead>Stock</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading ? (
-                    Array.from({ length: 5 }).map((_, i) => (
-                      <TableRow key={i}>
-                        <TableCell><Skeleton className="h-12 w-48" /></TableCell>
-                        <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                        <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                        <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                        <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                        <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                        <TableCell><Skeleton className="h-6 w-16" /></TableCell>
-                        <TableCell><Skeleton className="h-8 w-24" /></TableCell>
-                      </TableRow>
-                    ))
-                  ) : filteredProducts.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                        No products found
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredProducts.map((product: ProductWithColors) => {
-                      const stockStatus = getStockStatus(product);
-                      return (
-                        <TableRow key={product.id} className="hover:bg-muted">
-                          <TableCell>
-                            <div className="flex items-center space-x-3">
-                              <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center">
-                                <i className="fas fa-box text-muted-foreground"></i>
-                              </div>
-                              <div>
-                                <p className="font-medium" data-testid={`product-name-${product.id}`}>
-                                  {product.brand} {product.modelNumber}
-                                </p>
-                                <p className="text-sm text-muted-foreground">
-                                  Model: {product.modelNumber}
-                                </p>
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-sm" data-testid={`product-code-${product.id}`}>
-                            {product.productCode}
-                          </TableCell>
-                          <TableCell className="text-sm">{product.brand}</TableCell>
-                          <TableCell className="text-sm">{product.productType}</TableCell>
-                          <TableCell className="text-sm font-medium">AED {product.storePriceAED}</TableCell>
-                          <TableCell className="text-sm font-medium">AED {product.onlinePriceAED}</TableCell>
-                          <TableCell>
-                            <Badge variant={stockStatus.variant} data-testid={`product-stock-${product.id}`}>
-                              {stockStatus.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex space-x-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedProduct(product);
-                                  setShowProductDetails(true);
-                                }}
-                                data-testid={`button-view-${product.id}`}
-                              >
-                                <i className="fas fa-eye"></i>
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                data-testid={`button-edit-${product.id}`}
-                              >
-                                <i className="fas fa-edit"></i>
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDeleteProduct(product.id)}
-                                className="text-destructive hover:text-destructive"
-                                data-testid={`button-delete-${product.id}`}
-                              >
-                                <i className="fas fa-trash"></i>
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+          {/* Products Grid */}
+          <div className="products-grid">
+            {isLoading ? (
+              Array.from({ length: 8 }).map((_, i) => (
+                <Card key={i} className="product-card">
+                  <CardContent className="p-0">
+                    <Skeleton className="product-card-image" />
+                    <div className="p-6">
+                      <Skeleton className="h-6 w-3/4 mb-2" />
+                      <Skeleton className="h-4 w-1/2 mb-2" />
+                      <Skeleton className="h-4 w-2/3 mb-2" />
+                      <Skeleton className="h-8 w-20 mb-4" />
+                      <div className="flex gap-2">
+                        <Skeleton className="h-10 w-20" />
+                        <Skeleton className="h-10 w-20" />
+                        <Skeleton className="h-10 w-20" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            ) : filteredProducts.length === 0 ? (
+              <div className="col-span-full text-center py-12">
+                <i className="fas fa-box-open text-4xl text-muted-foreground mb-4"></i>
+                <p className="text-muted-foreground text-lg">{t("no_data")}</p>
+              </div>
+            ) : (
+              filteredProducts.map((product: ProductWithColors) => {
+                const stockStatus = getStockStatus(product);
+                const currentPrice = currentStore === 'boutique' ? product.storePriceAED : product.onlinePriceAED;
+                return (
+                  <Card key={product.id} className="product-card group hover:shadow-xl transition-shadow duration-300" data-testid={`product-card-${product.id}`}>
+                    <CardContent className="p-0">
+                      {/* Product Image */}
+                      <div className="relative overflow-hidden rounded-t-lg">
+                        {product.imageUrl ? (
+                          <img
+                            src={product.imageUrl}
+                            alt={`${product.brand} ${product.modelNumber}`}
+                            className="product-card-image transition-transform duration-300 group-hover:scale-105"
+                            data-testid={`product-image-${product.id}`}
+                          />
+                        ) : (
+                          <div className="product-card-image bg-muted flex items-center justify-center">
+                            <i className="fas fa-image text-4xl text-muted-foreground"></i>
+                          </div>
+                        )}
+                        <div className="absolute top-3 right-3">
+                          <Badge variant={stockStatus.variant} data-testid={`product-stock-${product.id}`}>
+                            {stockStatus.status}
+                          </Badge>
+                        </div>
+                      </div>
+                      
+                      {/* Product Info */}
+                      <div className="p-6">
+                        <h3 className="product-card-title" data-testid={`product-name-${product.id}`}>
+                          {product.brand} - {product.modelNumber}
+                        </h3>
+                        <p className="product-card-info">
+                          <span className="font-medium">{t("brand")}:</span> {product.brand}
+                        </p>
+                        <p className="product-card-info">
+                          <span className="font-medium">{t("product_type")}:</span> {product.productType}
+                        </p>
+                        <p className="product-card-info">
+                          <span className="font-medium">{t("model_number")}:</span> {product.modelNumber}
+                        </p>
+                        
+                        <div className="product-card-price number-ltr">
+                          {currentPrice} AED
+                        </div>
+                        
+                        {/* Action Buttons */}
+                        <div className="product-card-actions">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1"
+                            onClick={() => {
+                              setSelectedProduct(product);
+                              setShowProductDetails(true);
+                            }}
+                            data-testid={`button-stock-${product.id}`}
+                          >
+                            <i className="fas fa-box mr-2"></i>
+                            {t("view_stock")}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1"
+                            onClick={() => {
+                              setSelectedProduct(product);
+                              setShowEditProduct(true);
+                            }}
+                            data-testid={`button-edit-${product.id}`}
+                          >
+                            <i className="fas fa-edit mr-2"></i>
+                            {t("edit_product")}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1 text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground"
+                            onClick={() => handleDeleteProduct(product.id)}
+                            data-testid={`button-delete-${product.id}`}
+                          >
+                            <i className="fas fa-trash mr-2"></i>
+                            {t("delete_product")}
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })
+            )}
+          </div>
 
           {/* Product Details Modal */}
           {selectedProduct && (
@@ -310,6 +323,25 @@ export default function Inventory() {
               open={showProductDetails}
               onOpenChange={setShowProductDetails}
             />
+          )}
+
+          {/* Edit Product Modal */}
+          {selectedProduct && (
+            <Dialog open={showEditProduct} onOpenChange={setShowEditProduct}>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>{t("edit_product")}</DialogTitle>
+                </DialogHeader>
+                <ProductForm
+                  product={selectedProduct}
+                  onSuccess={() => {
+                    setShowEditProduct(false);
+                    setSelectedProduct(null);
+                    queryClient.invalidateQueries({ queryKey: [`/api/${currentStore}/products`] });
+                  }}
+                />
+              </DialogContent>
+            </Dialog>
           )}
         </main>
       </div>

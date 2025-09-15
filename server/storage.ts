@@ -44,6 +44,8 @@ export interface IStorage {
   // Product color operations
   createProductColor(color: InsertProductColor): Promise<ProductColor>;
   getProductColors(productId: number): Promise<ProductColor[]>;
+  getProductColor(productId: number, colorName: string): Promise<ProductColor | undefined>;
+  deleteProductColor(id: number): Promise<void>;
 
   // Inventory operations
   getInventory(store: string, productColorId?: number): Promise<Inventory[]>;
@@ -200,6 +202,23 @@ export class DatabaseStorage implements IStorage {
 
   async getProductColors(productId: number): Promise<ProductColor[]> {
     return await db.select().from(productColors).where(eq(productColors.productId, productId));
+  }
+
+  async getProductColor(productId: number, colorName: string): Promise<ProductColor | undefined> {
+    const [color] = await db
+      .select()
+      .from(productColors)
+      .where(
+        and(
+          eq(productColors.productId, productId),
+          eq(productColors.colorName, colorName)
+        )
+      );
+    return color;
+  }
+
+  async deleteProductColor(id: number): Promise<void> {
+    await db.delete(productColors).where(eq(productColors.id, id));
   }
 
   async getInventory(store: string, productColorId?: number): Promise<Inventory[]> {

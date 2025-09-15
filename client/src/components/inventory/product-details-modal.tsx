@@ -56,7 +56,7 @@ export default function ProductDetailsModal({
                 {product.brand} {product.modelNumber}
               </h4>
               <p className="text-muted-foreground" data-testid="product-detail-codes">
-                Model: {product.modelNumber} | Code: {product.productCode}
+                Model: {product.modelNumber}
               </p>
             </div>
             

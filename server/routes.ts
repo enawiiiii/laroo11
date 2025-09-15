@@ -67,7 +67,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(product);
     } catch (error) {
       console.error("Error creating product:", error);
-      res.status(500).json({ message: "Failed to create product" });
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: error.errors[0]?.message || "بيانات غير صحيحة" });
+      }
+      res.status(500).json({ message: "فشل في إضافة المنتج" });
     }
   });
 
@@ -98,6 +101,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/products/:id/colors", async (req, res) => {
     try {
       const productId = parseInt(req.params.id);
+      
+      // Check if color already exists
+      const existingColor = await storage.getProductColor(productId, req.body.colorName);
+      if (existingColor) {
+        return res.json(existingColor); // Return existing color instead of creating duplicate
+      }
+      
       const color = await storage.createProductColor({
         productId,
         colorName: req.body.colorName,
@@ -106,6 +116,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating product color:", error);
       res.status(500).json({ message: "Failed to create product color" });
+    }
+  });
+
+  app.get("/api/products/:id/colors", async (req, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      const colors = await storage.getProductColors(productId);
+      res.json(colors);
+    } catch (error) {
+      console.error("Error fetching product colors:", error);
+      res.status(500).json({ message: "Failed to fetch product colors" });
+    }
+  });
+
+  app.delete("/api/colors/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteProductColor(id);
+      res.json({ message: "Color deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting product color:", error);
+      res.status(500).json({ message: "Failed to delete product color" });
     }
   });
 
@@ -162,20 +194,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid store" });
       }
 
+      // Only boutique can make sales
+      if (store !== "boutique") {
+        return res.status(400).json({ message: "المبيعات متاحة فقط في البوتيك" });
+      }
+
+      const { productColorId, size, quantity, paymentMethod, unitPrice } = req.body;
+      
+      // Validate payment method for boutique
+      if (!["cash", "card"].includes(paymentMethod)) {
+        return res.status(400).json({ message: "البوتيك يقبل الدفع النقدي أو الفيزا فقط" });
+      }
+
       // Check inventory availability
-      const { productColorId, size, quantity } = req.body;
       const available = await storage.checkInventoryAvailability(productColorId, store, size.toString(), quantity);
       
       if (!available) {
-        return res.status(400).json({ message: "Insufficient inventory" });
+        return res.status(400).json({ message: "المخزون غير كافي" });
       }
 
-      const validatedData = insertSaleSchema.parse({ ...req.body, store });
+      // Calculate tax and total for visa payments
+      let taxAmount = "0";
+      let totalAmount = (parseFloat(unitPrice) * quantity).toString();
+      
+      if (paymentMethod === "card") {
+        const subtotal = parseFloat(unitPrice) * quantity;
+        taxAmount = (subtotal * 0.05).toFixed(2); // 5% tax on visa
+        totalAmount = (subtotal + parseFloat(taxAmount)).toFixed(2);
+      }
+
+      const validatedData = insertSaleSchema.parse({ 
+        ...req.body, 
+        store,
+        taxAmount,
+        totalAmount 
+      });
       const sale = await storage.createSale(validatedData);
       res.json(sale);
     } catch (error) {
       console.error("Error creating sale:", error);
-      res.status(500).json({ message: "Failed to create sale" });
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: error.errors[0]?.message || "بيانات غير صحيحة" });
+      }
+      res.status(500).json({ message: "فشل في إنشاء البيع" });
     }
   });
 
@@ -196,20 +257,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/orders", async (req, res) => {
     try {
+      const { productColorId, size, quantity, paymentMethod, unitPrice } = req.body;
+      
+      // Validate payment method for online orders
+      if (!["bank_transfer", "cash_on_delivery"].includes(paymentMethod)) {
+        return res.status(400).json({ message: "الأونلاين يقبل التحويل البنكي أو الدفع عند الاستلام فقط" });
+      }
+
       // Check inventory availability for online store
-      const { productColorId, size, quantity } = req.body;
       const available = await storage.checkInventoryAvailability(productColorId, "online", size.toString(), quantity);
       
       if (!available) {
-        return res.status(400).json({ message: "Insufficient inventory" });
+        return res.status(400).json({ message: "المخزون غير كافي" });
       }
 
-      const validatedData = insertOrderSchema.parse(req.body);
+      // Calculate total (no tax for online orders)
+      const totalAmount = (parseFloat(unitPrice) * quantity).toFixed(2);
+
+      const validatedData = insertOrderSchema.parse({ 
+        ...req.body,
+        totalAmount,
+        store: "online"
+      });
       const order = await storage.createOrder(validatedData);
       res.json(order);
     } catch (error) {
       console.error("Error creating order:", error);
-      res.status(500).json({ message: "Failed to create order" });
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: error.errors[0]?.message || "بيانات غير صحيحة" });
+      }
+      res.status(500).json({ message: "فشل في إنشاء الطلب" });
     }
   });
 

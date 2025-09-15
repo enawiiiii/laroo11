@@ -30,8 +30,7 @@ export const employees = pgTable("employees", {
 // Products table
 export const products = pgTable("products", {
   id: serial("id").primaryKey(),
-  productCode: varchar("product_code", { length: 50 }).notNull().unique(),
-  modelNumber: varchar("model_number", { length: 50 }).notNull(),
+  modelNumber: varchar("model_number", { length: 50 }).notNull().unique(),
   brand: varchar("brand", { length: 100 }).notNull(),
   productType: varchar("product_type", { length: 50 }).notNull(),
   storePriceAED: decimal("store_price_aed", { precision: 10, scale: 2 }).notNull(),
@@ -55,7 +54,7 @@ export const inventory = pgTable("inventory", {
   id: serial("id").primaryKey(),
   productColorId: integer("product_color_id").references(() => productColors.id, { onDelete: "cascade" }).notNull(),
   store: storeEnum("store").notNull(),
-  size: decimal("size", { precision: 4, scale: 1 }).notNull(), // Numeric sizes like 36, 36.5, 37
+  size: decimal("size", { precision: 4, scale: 1 }).notNull(), // Valid sizes: 38, 40, 42, 44, 46, 48, 50, 52
   quantity: integer("quantity").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -196,6 +195,33 @@ export const insertProductSchema = createInsertSchema(products).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  // Add custom validation for sizes
+  modelNumber: z.string().min(1, "رقم الموديل مطلوب"),
+  brand: z.string().min(1, "اسم الشركة مطلوب"),
+  productType: z.string().min(1, "نوع القطعة مطلوب"),
+  storePriceAED: z.string().min(1, "سعر البوتيك مطلوب"),
+  onlinePriceAED: z.string().min(1, "السعر الأونلاين مطلوب"),
+});
+
+// Valid sizes constraint
+export const VALID_SIZES = [38, 40, 42, 44, 46, 48, 50, 52] as const;
+export const sizeSchema = z.number().refine(
+  (size) => VALID_SIZES.includes(size as typeof VALID_SIZES[number]),
+  { message: "المقاس يجب أن يكون من المقاسات المتاحة: 38, 40, 42, 44, 46, 48, 50, 52" }
+);
+
+// Payment method validation schemas
+export const boutiquePaymentSchema = z.object({
+  paymentMethod: z.enum(["cash", "card"], { message: "البوتيك يقبل الدفع النقدي أو الفيزا فقط" }),
+  store: z.literal("boutique"),
+  taxAmount: z.string().optional(),
+  totalAmount: z.string(),
+});
+
+export const onlinePaymentSchema = z.object({
+  paymentMethod: z.enum(["bank_transfer", "cash_on_delivery"], { message: "الأونلاين يقبل التحويل البنكي أو الدفع عند الاستلام فقط" }),
+  totalAmount: z.string(),
 });
 
 export const insertProductColorSchema = createInsertSchema(productColors).omit({
@@ -207,22 +233,35 @@ export const insertInventorySchema = createInsertSchema(inventory).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  size: sizeSchema.transform(String), // Convert to string for database storage
 });
 
 export const insertSaleSchema = createInsertSchema(sales).omit({
   id: true,
   createdAt: true,
+}).extend({
+  size: sizeSchema.transform(String),
 });
 
 export const insertOrderSchema = createInsertSchema(orders).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  size: sizeSchema.transform(String),
+  customerName: z.string().min(1, "اسم الزبون مطلوب"),
+  customerPhone: z.string().min(1, "رقم الهاتف مطلوب"),
+  customerEmirate: z.string().min(1, "الإمارة مطلوبة"),
+  customerAddress: z.string().min(1, "العنوان مطلوب"),
 });
 
 export const insertReturnSchema = createInsertSchema(returns).omit({
   id: true,
   createdAt: true,
+}).extend({
+  originalSize: sizeSchema.transform(String),
+  newSize: z.optional(sizeSchema.transform(String)),
 });
 
 // Types

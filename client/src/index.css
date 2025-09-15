@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@200..1000&family=Amiri:ital,wght@0,400;0,700;1,400;1,700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -23,7 +24,7 @@
   --input: hsl(214.3, 31.8%, 91.4%);
   --ring: hsl(346, 87%, 48%);
   --radius: 0.75rem;
-  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  --font-sans: 'Cairo', Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
 }
 
 .dark {
@@ -58,6 +59,52 @@
   }
 }
 
+/* RTL Support */
+html[dir="rtl"] {
+  font-family: 'Cairo', 'Amiri', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+}
+
+/* Custom Black & Gold Theme for Login */
+.login-theme {
+  --background: 0 0% 8%; /* Deep black */
+  --foreground: 45 100% 60%; /* Gold */
+  --card: 0 0% 12%; /* Dark gray */
+  --card-foreground: 45 100% 70%; /* Light gold */
+  --popover: 0 0% 12%;
+  --popover-foreground: 45 100% 70%;
+  --primary: 45 100% 50%; /* Pure gold */
+  --primary-foreground: 0 0% 8%;
+  --secondary: 0 0% 18%;
+  --secondary-foreground: 45 100% 85%;
+  --muted: 0 0% 18%;
+  --muted-foreground: 45 30% 70%;
+  --accent: 45 100% 60%;
+  --accent-foreground: 0 0% 8%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 0 85.7% 97.3%;
+  --border: 0 0% 20%;
+  --input: 0 0% 20%;
+  --ring: 45 100% 50%;
+  --radius: 0.5rem;
+}
+
+.login-theme .gradient-bg {
+  background: linear-gradient(135deg, #000000 0%, #1a1a1a 50%, #2d2d2d 100%);
+}
+
+.login-theme .gold-gradient {
+  background: linear-gradient(135deg, #FFD700 0%, #FFA500 50%, #FF8C00 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.login-theme .card-gold-border {
+  border: 2px solid hsl(45, 100%, 50%);
+  box-shadow: 0 4px 20px rgba(255, 215, 0, 0.1);
+}
+
 .login-container {
   background: linear-gradient(135deg, var(--primary) 0%, hsl(346, 87%, 58%) 100%);
 }
@@ -65,4 +112,86 @@
 .sidebar-active {
   background-color: var(--accent);
   color: var(--accent-foreground);
+}
+
+/* Product Cards */
+.product-card {
+  @apply bg-card border border-border rounded-lg p-6 hover:shadow-lg transition-shadow;
+}
+
+.product-card-image {
+  @apply w-full h-48 object-cover rounded-md mb-4;
+}
+
+.product-card-title {
+  @apply text-lg font-semibold text-foreground mb-2;
+}
+
+.product-card-info {
+  @apply text-sm text-muted-foreground mb-1;
+}
+
+.product-card-price {
+  @apply text-xl font-bold text-primary mb-4;
+}
+
+.product-card-stock {
+  @apply text-sm text-muted-foreground mb-4;
+}
+
+.product-card-actions {
+  @apply flex flex-wrap gap-2;
+}
+
+/* Products Grid */
+.products-grid {
+  @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6;
+}
+
+/* RTL specific adjustments */
+html[dir="rtl"] .flex {
+  direction: ltr;
+}
+
+html[dir="rtl"] .flex > * {
+  direction: rtl;
+}
+
+/* Fix for shadcn components in RTL */
+html[dir="rtl"] .data-[side=right]:not([data-state=open]) {
+  left: auto;
+  right: 100%;
+}
+
+html[dir="rtl"] .data-[side=left]:not([data-state=open]) {
+  left: 100%;
+  right: auto;
+}
+
+/* Numbers should remain LTR in RTL text */
+.number-ltr {
+  direction: ltr;
+  display: inline-block;
+  unicode-bidi: embed;
+}
+
+/* Status badges */
+.status-badge {
+  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+}
+
+.status-pending {
+  @apply bg-yellow-100 text-yellow-800;
+}
+
+.status-completed {
+  @apply bg-green-100 text-green-800;
+}
+
+.status-cancelled {
+  @apply bg-red-100 text-red-800;
+}
+
+.status-in-delivery {
+  @apply bg-blue-100 text-blue-800;
 }
