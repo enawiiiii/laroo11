@@ -1,0 +1,139 @@
+You are a senior full-stack developer acting as a Replit agent. Your task is to **create, verify, and prepare a full-stack web application** for a fashion store called LaRosa. The application must manage **inventory, sales, returns, and exports**, support **two fully separated stores: Boutique and Online**, and be fully functional for **frontend and backend**, ready to deploy to **Render.com**. Follow all instructions precisely.
+
+---
+
+1. Project Setup
+- Full-stack architecture: React frontend + Node.js/Express backend (or equivalent).  
+- Include database integration (PostgreSQL or SQLite).  
+- Use store_id or equivalent field to fully separate Boutique and Online stores.  
+- Install all dependencies, configure scripts, and prepare project for **Render deployment**.  
+- Organize project files: frontend, backend, images, exports clearly separated.  
+
+---
+
+2. Employees and Store Selection
+- Login page: "Hello, who are you?" → select employee → select store (Boutique / Online).  
+- Employees: Abdulrahman, Heba, Hadeel (more can be added).  
+- Top bar shows Employee name + Current Store with buttons: Change Employee, Change Store.  
+- Store selection must filter all operations (inventory, sales, returns) by store.  
+
+---
+
+3. Inventory Management
+- Product fields: Image, Product code, Model number, Brand/Company, Product type, Store price (AED), Online price (AED), Specifications (text).  
+- Multiple colors per product.  
+- Numeric sizes per color (e.g., 36, 36.5, 37) with quantity.  
+- Prevent duplicate sizes per color.  
+- CRUD actions: Details (view colors, sizes, quantities), Edit (modify existing product), Delete (remove product).  
+- Inventory **fully isolated per store**.  
+- Validate all inputs.  
+
+---
+
+4. Sales Management
+**Boutique Sales:**  
+- Payment: Cash (no tax), Card (5% tax, removable).  
+- Product selection: Product → Color → Numeric Size → Quantity.  
+- Inventory updated automatically.  
+
+**Online Sales:**  
+- Capture customer info: Name, Phone, Emirate, Address (large text), Tracking number, Notes.  
+- Product selection: Product → Color → Numeric Size → Quantity.  
+- Payment: Cash on Delivery or Bank Transfer.  
+- Order statuses: Delivered, In Delivery, Canceled.  
+- Inventory updated automatically for Online store only.  
+
+---
+
+5. Returns and Exchanges
+- Types: Refund (no replacement), Exchange (replace product).  
+- Exchange types: Color to Color, Size to Size, Model to Model.  
+- Process: select original sale/order → product, color, size → update inventory.  
+- Exchanges update both returned and new product quantities.  
+- Returns/exchanges are store-specific.  
+
+---
+
+6. Exports and Manufacturing Integration
+- Generate store-specific export folders:  
+
+LaRosa_Export_{store}YYYY-MM-DD/
+├─ product_catalog{store}.csv
+├─ sizes_colors_{store}.csv
+├─ inventory_report_{store}.csv
+├─ sales_report_{store}.csv
+├─ returns_report_{store}.csv
+├─ images/
+└─ readme_{store}.txt
+
+yaml
+نسخ الكود
+
+- Only include relevant data per store.  
+- Sizes exported as numeric values.  
+- Export can be triggered from frontend or backend.  
+
+---
+
+7. Frontend Requirements
+- React components for Inventory CRUD, Sales, Returns/Exchanges, Exports.  
+- Clean UX for selecting product, color, numeric size, and quantity.  
+- Store switching reflected immediately across all screens.  
+- Multilingual support: Arabic/English with RTL/LTR.  
+- Display prices in AED.  
+- Responsive design for desktop and tablet screens.  
+
+---
+
+8. Backend Requirements
+- Node.js/Express (or equivalent) APIs, fully store-aware:  
+
+GET /api/{store_key}/products
+POST /api/{store_key}/products
+POST /api/{store_key}/sales
+POST /api/{store_key}/orders
+POST /api/{store_key}/returns
+GET /api/{store_key}/exports
+
+sql
+نسخ الكود
+
+- Validate inputs: numeric sizes, quantity availability.  
+- Inventory, sales, and returns updates isolated per store.  
+- Include authentication for employees.  
+- Database schema: products table, inventory table (colors, numeric sizes, quantity), sales table, returns table, employees table, orders table.  
+
+---
+
+9. Testing and Verification
+- Verify all CRUD operations for inventory, sales, returns per store.  
+- Check automatic inventory updates.  
+- Verify exports generate correct files per store.  
+- Test employee switching and store switching.  
+- Ensure application works without errors on Replit.  
+- Log errors and report inconsistencies in console.  
+
+---
+
+10. Render Deployment
+- Organize frontend, backend, images, and exports for Render deployment.  
+- Include package.json, start scripts, environment variable handling.  
+- Ensure static files and export folders are linked correctly.  
+- Deployment must run without errors and all stores are fully isolated.  
+
+---
+
+11. Acceptance Criteria
+- Inventory, sales, returns fully functional and store-specific.  
+- Numeric sizes correctly handled with colors.  
+- Employee and store selection filters all data correctly.  
+- Export functionality works and produces separate folders per store.  
+- Multilingual interface works correctly.  
+- Prices in AED.  
+- Application ready for immediate deployment on Render.  
+
+Instructions:
+- Generate all React components, backend API endpoints, and database schema.  
+- Separate files for frontend, backend, images, exports.  
+- Ensure fully functional MVP for Boutique and Online stores.  
+- Focus especially on Inventory, Sales, and Returns, but ensure all other functionality is implemented for a complete project.
